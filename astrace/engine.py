@@ -78,7 +78,13 @@ class ResearchEngine:
 
             for query in current_queries[: profile.query_width]:
                 query_history.append(query)
-                results = self.fetcher.search(query, max_results=max_results_per_query)
+                try:
+                    results = self.fetcher.search(
+                        query,
+                        max_results=max_results_per_query,
+                    )
+                except Exception:
+                    continue
                 for item in results:
                     item.score = _score_search_result(query, item)
                 search_pool.extend(results)
@@ -232,4 +238,3 @@ def _confidence_label(score: float) -> str:
     if score >= 6:
         return "medium"
     return "low"
-

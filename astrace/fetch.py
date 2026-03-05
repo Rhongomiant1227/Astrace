@@ -20,9 +20,11 @@ class WebFetcher:
         self,
         timeout: float = 15.0,
         max_text_chars: int = 12000,
+        search_backends: tuple[str, ...] | None = None,
     ) -> None:
         self.timeout = timeout
         self.max_text_chars = max_text_chars
+        self.search_backends = search_backends or ("ddg", "bing")
         self.client = httpx.Client(
             timeout=timeout,
             follow_redirects=True,
@@ -33,41 +35,21 @@ class WebFetcher:
         self.client.close()
 
     def search(self, query: str, max_results: int = 8) -> list[SearchResult]:
-        params = {"q": query}
-        resp = self.client.get("https://html.duckduckgo.com/html/", params=params)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-
         out: list[SearchResult] = []
         seen: set[str] = set()
-        for result in soup.select(".result"):
-            a_tag = result.select_one("a.result__a")
-            if not a_tag:
-                continue
-
-            title = _normalize_ws(a_tag.get_text(" ", strip=True))
-            raw_url = (a_tag.get("href") or "").strip()
-            url = _normalize_result_url(raw_url)
-            snippet_tag = result.select_one(".result__snippet")
-            snippet = _normalize_ws(
-                snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
+        for backend in self.search_backends:
+            backend_results = self._search_backend(
+                backend=backend,
+                query=query,
+                max_results=max_results,
             )
-
-            if not title or not url:
-                continue
-            if url in seen:
-                continue
-            seen.add(url)
-            out.append(
-                SearchResult(
-                    query=query,
-                    title=title,
-                    url=url,
-                    snippet=snippet,
-                )
-            )
-            if len(out) >= max_results:
-                break
+            for item in backend_results:
+                if item.url in seen:
+                    continue
+                seen.add(item.url)
+                out.append(item)
+                if len(out) >= max_results:
+                    return out
         return out
 
     def fetch_text(self, url: str) -> str:
@@ -82,6 +64,32 @@ class WebFetcher:
         text = html.unescape(text)
         text = _normalize_ws(text)
         return text[: self.max_text_chars]
+
+    def _search_backend(
+        self,
+        backend: str,
+        query: str,
+        max_results: int,
+    ) -> list[SearchResult]:
+        if backend == "ddg":
+            return self._search_ddg(query=query, max_results=max_results)
+        if backend == "bing":
+            return self._search_bing(query=query, max_results=max_results)
+        return []
+
+    def _search_ddg(self, query: str, max_results: int) -> list[SearchResult]:
+        params = {"q": query}
+        resp = self.client.get("https://html.duckduckgo.com/html/", params=params)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return _parse_ddg_results(soup=soup, query=query, max_results=max_results)
+
+    def _search_bing(self, query: str, max_results: int) -> list[SearchResult]:
+        params = {"q": query}
+        resp = self.client.get("https://www.bing.com/search", params=params)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return _parse_bing_results(soup=soup, query=query, max_results=max_results)
 
 
 def _normalize_result_url(raw_url: str) -> str:
@@ -100,3 +108,69 @@ def _normalize_result_url(raw_url: str) -> str:
 def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
+
+def _parse_ddg_results(
+    soup: BeautifulSoup,
+    query: str,
+    max_results: int,
+) -> list[SearchResult]:
+    out: list[SearchResult] = []
+    for result in soup.select(".result"):
+        a_tag = result.select_one("a.result__a")
+        if not a_tag:
+            continue
+
+        title = _normalize_ws(a_tag.get_text(" ", strip=True))
+        raw_url = (a_tag.get("href") or "").strip()
+        url = _normalize_result_url(raw_url)
+        snippet_tag = result.select_one(".result__snippet")
+        snippet = _normalize_ws(
+            snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
+        )
+
+        if not title or not url:
+            continue
+        out.append(
+            SearchResult(
+                query=query,
+                title=title,
+                url=url,
+                snippet=snippet,
+            )
+        )
+        if len(out) >= max_results:
+            break
+    return out
+
+
+def _parse_bing_results(
+    soup: BeautifulSoup,
+    query: str,
+    max_results: int,
+) -> list[SearchResult]:
+    out: list[SearchResult] = []
+    for result in soup.select("li.b_algo"):
+        a_tag = result.select_one("h2 a")
+        if not a_tag:
+            continue
+
+        title = _normalize_ws(a_tag.get_text(" ", strip=True))
+        url = _normalize_result_url((a_tag.get("href") or "").strip())
+        snippet_tag = result.select_one(".b_caption p") or result.select_one("p")
+        snippet = _normalize_ws(
+            snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
+        )
+
+        if not title or not url:
+            continue
+        out.append(
+            SearchResult(
+                query=query,
+                title=title,
+                url=url,
+                snippet=snippet,
+            )
+        )
+        if len(out) >= max_results:
+            break
+    return out
