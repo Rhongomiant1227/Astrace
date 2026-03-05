@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "astrace-research": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": {}
+    }
+  },
+  "notes": [
+    "Map this template to your AstrBot version's MCP config schema.",
+    "For Docker deployment, replace 127.0.0.1 with the container service name."
+  ]
+}
+

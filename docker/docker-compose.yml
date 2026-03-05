@@ -1,0 +1,23 @@
+services:
+  astrace:
+    container_name: astrace-mcp
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${ASTRACE_PORT:-8788}:8788"
+    healthcheck:
+      test: ["CMD", "python", "-m", "astrace.server", "--self-test"]
+      interval: 60s
+      timeout: 10s
+      retries: 2
+      start_period: 15s
+    networks:
+      - astrace-net
+
+networks:
+  astrace-net:
+    driver: bridge
