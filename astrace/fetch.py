@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import html
 import re
+from collections import Counter
 from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
@@ -49,9 +50,7 @@ class WebFetcher:
                     continue
                 seen.add(item.url)
                 out.append(item)
-                if len(out) >= max_results:
-                    return out
-        return out
+        return _select_diverse_results(out, max_results=max_results)
 
     def fetch_text(self, url: str) -> str:
         resp = self.client.get(url)
@@ -263,3 +262,39 @@ def _is_candidate_url(url: str) -> bool:
         "https://go.microsoft.com/",
     )
     return not lowered.startswith(blocked_prefixes)
+
+
+def _select_diverse_results(
+    candidates: list[SearchResult],
+    max_results: int,
+    max_per_domain: int = 2,
+) -> list[SearchResult]:
+    if max_results <= 0:
+        return []
+    if not candidates:
+        return []
+
+    selected: list[SearchResult] = []
+    domain_counter: Counter[str] = Counter()
+
+    for item in candidates:
+        domain = (urlparse(item.url).netloc or "").lower()
+        if domain and domain_counter[domain] >= max_per_domain:
+            continue
+        selected.append(item)
+        if domain:
+            domain_counter[domain] += 1
+        if len(selected) >= max_results:
+            return selected
+
+    if len(selected) >= max_results:
+        return selected[:max_results]
+
+    selected_urls = {item.url for item in selected}
+    for item in candidates:
+        if item.url in selected_urls:
+            continue
+        selected.append(item)
+        if len(selected) >= max_results:
+            break
+    return selected[:max_results]

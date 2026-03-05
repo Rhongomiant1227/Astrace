@@ -92,7 +92,10 @@ def test_search_stops_after_first_backend_if_limit_hit():
 
     assert len(results) == 1
     assert results[0].url == "https://example.com/ddg"
-    assert fetcher.client.calls == ["https://html.duckduckgo.com/html/"]
+    assert fetcher.client.calls == [
+        "https://html.duckduckgo.com/html/",
+        "https://www.bing.com/search",
+    ]
 
 
 def test_search_can_fall_back_to_bing_news():
@@ -113,6 +116,32 @@ def test_search_can_fall_back_to_bing_news():
     assert len(results) == 1
     assert results[0].url == "https://example.com/news"
     assert results[0].title == "News Result"
+
+
+def test_search_limits_single_domain_and_keeps_diversity():
+    fetcher = WebFetcher(search_backends=("ddg", "bing", "bing_news"))
+    fetcher.client = _StubClient(
+        ddg_text="<html><body></body></html>",
+        bing_text=(
+            "<html><body>"
+            "<li class='b_algo'><h2><a href='https://same.test/a'>A</a></h2></li>"
+            "<li class='b_algo'><h2><a href='https://same.test/b'>B</a></h2></li>"
+            "<li class='b_algo'><h2><a href='https://same.test/c'>C</a></h2></li>"
+            "</body></html>"
+        ),
+        bing_news_text=(
+            "<html><body>"
+            "<a class='title' href='https://other.test/news'>News Result</a>"
+            "</body></html>"
+        ),
+    )
+
+    results = fetcher.search("astrbot mcp", max_results=3)
+
+    assert len(results) == 3
+    assert results[0].url == "https://same.test/a"
+    assert results[1].url == "https://same.test/b"
+    assert results[2].url == "https://other.test/news"
 
 
 def test_bing_redirect_url_is_unwrapped():
