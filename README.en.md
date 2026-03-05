@@ -8,6 +8,13 @@ It can be used in two ways:
 - As an **MCP backend for AstrBot** (AstrBot official repo: <https://github.com/AstrBotDevs/AstrBot>)
 - As a **standalone MCP server** for any MCP-compatible client
 
+## Name Origin
+
+`Astrace = AstrBot + Trace`
+
+- `Astr`: from the AstrBot ecosystem, focused on bot and plugin workflows
+- `Trace`: emphasizes traceable research steps and evidence-chain output
+
 ## Core Features
 
 - Research depth control: `auto` / `shallow` / `deep`

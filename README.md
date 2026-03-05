@@ -8,6 +8,13 @@ Astrace 是一个面向 **AstrBot + NapCat** 场景的 MCP 调研服务。
 - 作为 **AstrBot 的 MCP 服务** 使用（AstrBot 原项目：<https://github.com/AstrBotDevs/AstrBot>）
 - 也可以 **独立部署并单独使用**，作为通用 MCP Research Server
 
+## 名字由来
+
+`Astrace = AstrBot + Trace`
+
+- `Astr`：来自 AstrBot 生态，强调面向机器人与插件场景
+- `Trace`：强调可追踪（traceable）的调研过程和证据链输出
+
 ## 核心能力
 
 - 调研深度控制：`auto` / `shallow` / `deep`
