@@ -25,7 +25,7 @@ class WebFetcher:
     ) -> None:
         self.timeout = timeout
         self.max_text_chars = max_text_chars
-        self.search_backends = search_backends or ("ddg", "bing")
+        self.search_backends = search_backends or ("ddg", "bing", "bing_news")
         self.client = httpx.Client(
             timeout=timeout,
             follow_redirects=True,
@@ -76,6 +76,8 @@ class WebFetcher:
             return self._search_ddg(query=query, max_results=max_results)
         if backend == "bing":
             return self._search_bing(query=query, max_results=max_results)
+        if backend == "bing_news":
+            return self._search_bing_news(query=query, max_results=max_results)
         return []
 
     def _search_ddg(self, query: str, max_results: int) -> list[SearchResult]:
@@ -91,6 +93,13 @@ class WebFetcher:
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         return _parse_bing_results(soup=soup, query=query, max_results=max_results)
+
+    def _search_bing_news(self, query: str, max_results: int) -> list[SearchResult]:
+        params = {"q": query}
+        resp = self.client.get("https://www.bing.com/news/search", params=params)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return _parse_bing_news_results(soup=soup, query=query, max_results=max_results)
 
 
 def _normalize_result_url(raw_url: str) -> str:
@@ -185,6 +194,8 @@ def _parse_bing_results(
 
         title = _normalize_ws(a_tag.get_text(" ", strip=True))
         url = _normalize_result_url((a_tag.get("href") or "").strip())
+        if not _is_candidate_url(url):
+            continue
         snippet_tag = result.select_one(".b_caption p") or result.select_one("p")
         snippet = _normalize_ws(
             snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
@@ -203,3 +214,52 @@ def _parse_bing_results(
         if len(out) >= max_results:
             break
     return out
+
+
+def _parse_bing_news_results(
+    soup: BeautifulSoup,
+    query: str,
+    max_results: int,
+) -> list[SearchResult]:
+    out: list[SearchResult] = []
+    for a_tag in soup.select("a.title[href]"):
+        title = _normalize_ws(a_tag.get_text(" ", strip=True))
+        url = _normalize_result_url((a_tag.get("href") or "").strip())
+        if not _is_candidate_url(url):
+            continue
+
+        card = a_tag.find_parent()
+        snippet = ""
+        if card:
+            snippet_tag = card.select_one(".snippet") or card.select_one(".source")
+            snippet = _normalize_ws(
+                snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
+            )
+
+        if not title or not url:
+            continue
+        out.append(
+            SearchResult(
+                query=query,
+                title=title,
+                url=url,
+                snippet=snippet,
+            )
+        )
+        if len(out) >= max_results:
+            break
+    return out
+
+
+def _is_candidate_url(url: str) -> bool:
+    if not url.startswith(("http://", "https://")):
+        return False
+    lowered = url.lower()
+    blocked_prefixes = (
+        "https://www.bing.com/ck/a",
+        "https://www.bing.com/search",
+        "https://www.bing.com/news/search",
+        "http://go.microsoft.com/",
+        "https://go.microsoft.com/",
+    )
+    return not lowered.startswith(blocked_prefixes)

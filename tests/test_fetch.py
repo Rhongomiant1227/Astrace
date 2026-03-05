@@ -26,15 +26,18 @@ class _StubResponse:
 
 
 class _StubClient:
-    def __init__(self, ddg_text: str, bing_text: str) -> None:
+    def __init__(self, ddg_text: str, bing_text: str, bing_news_text: str = "") -> None:
         self.ddg_text = ddg_text
         self.bing_text = bing_text
+        self.bing_news_text = bing_news_text
         self.calls: list[str] = []
 
     def get(self, url: str, params: dict | None = None) -> _StubResponse:
         self.calls.append(url)
         if "duckduckgo.com" in url:
             return _StubResponse(url=url, status_code=202, text=self.ddg_text)
+        if "bing.com/news/search" in url:
+            return _StubResponse(url=url, status_code=200, text=self.bing_news_text)
         if "bing.com" in url:
             return _StubResponse(url=url, status_code=200, text=self.bing_text)
         return _StubResponse(url=url, status_code=404, text="")
@@ -90,6 +93,26 @@ def test_search_stops_after_first_backend_if_limit_hit():
     assert len(results) == 1
     assert results[0].url == "https://example.com/ddg"
     assert fetcher.client.calls == ["https://html.duckduckgo.com/html/"]
+
+
+def test_search_can_fall_back_to_bing_news():
+    fetcher = WebFetcher(search_backends=("ddg", "bing", "bing_news"))
+    fetcher.client = _StubClient(
+        ddg_text="<html><body></body></html>",
+        bing_text="<html><body></body></html>",
+        bing_news_text=(
+            "<html><body>"
+            "<a class='title' href='https://example.com/news'>News Result</a>"
+            "<div class='snippet'>News snippet</div>"
+            "</body></html>"
+        ),
+    )
+
+    results = fetcher.search("astrbot mcp", max_results=3)
+
+    assert len(results) == 1
+    assert results[0].url == "https://example.com/news"
+    assert results[0].title == "News Result"
 
 
 def test_bing_redirect_url_is_unwrapped():
