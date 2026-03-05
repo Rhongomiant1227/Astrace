@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import html
 import re
 from urllib.parse import parse_qs, unquote, urlparse
@@ -102,11 +103,39 @@ def _normalize_result_url(raw_url: str) -> str:
         unwrapped = qs.get("uddg", [""])[0]
         if unwrapped:
             url = unquote(unwrapped)
+    if "bing.com/ck/a" in url and "u=" in url:
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        unwrapped = _decode_bing_target(qs.get("u", [""])[0])
+        if unwrapped:
+            url = unwrapped
     return url.strip()
 
 
 def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _decode_bing_target(encoded: str) -> str:
+    token = (encoded or "").strip()
+    if not token:
+        return ""
+    if token.startswith("a1"):
+        token = token[2:]
+    token = unquote(token)
+    if token.startswith(("http://", "https://")):
+        return token
+
+    # Bing commonly packs the URL as URL-safe base64 without padding.
+    padding = "=" * ((4 - len(token) % 4) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(token + padding).decode(
+            "utf-8",
+            errors="ignore",
+        )
+    except Exception:
+        return ""
+    return decoded if decoded.startswith(("http://", "https://")) else ""
 
 
 def _parse_ddg_results(

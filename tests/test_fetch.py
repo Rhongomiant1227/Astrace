@@ -1,6 +1,8 @@
+import base64
+
 import httpx
 
-from astrace.fetch import WebFetcher
+from astrace.fetch import WebFetcher, _normalize_result_url
 
 
 class _StubResponse:
@@ -88,3 +90,11 @@ def test_search_stops_after_first_backend_if_limit_hit():
     assert len(results) == 1
     assert results[0].url == "https://example.com/ddg"
     assert fetcher.client.calls == ["https://html.duckduckgo.com/html/"]
+
+
+def test_bing_redirect_url_is_unwrapped():
+    target = "https://example.com/path?q=1&lang=zh"
+    encoded = base64.urlsafe_b64encode(target.encode("utf-8")).decode("ascii").rstrip("=")
+    wrapped = f"https://www.bing.com/ck/a?u=a1{encoded}&ntb=1"
+
+    assert _normalize_result_url(wrapped) == target
