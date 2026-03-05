@@ -1,29 +1,33 @@
-# Astrace
+﻿# Astrace
 
-Language: **English** | [简体中文](README.zh-CN.md)
+语言 / Language: **简体中文** | [English](README.en.md)
 
-Astrace is an MCP research server designed for **AstrBot + NapCat** scenarios.
+Astrace 是一个面向 **AstrBot + NapCat** 场景的 MCP 调研服务。
 
-Core goals:
-- Provide a stable research capability layer for QQ bot workflows.
-- Keep one shared Python codebase across Windows/Linux.
-- Support deployment as local process or Docker service.
-- Let the model choose research depth: `auto`, `shallow`, `deep`.
+它既可以：
+- 作为 **AstrBot 的 MCP 服务** 使用（AstrBot 原项目：<https://github.com/AstrBotDevs/AstrBot>）
+- 也可以 **独立部署并单独使用**，作为通用 MCP Research Server
 
-## Why Astrace
+## 核心能力
 
-Plain search tools are often too shallow for plugin ecosystems and large-topic investigation.
-Astrace exposes a traceable pipeline:
+- 调研深度控制：`auto` / `shallow` / `deep`
+- 结构化输出：结论、证据来源、迭代轨迹
+- 异步任务：支持长时调研任务的启动、查询状态和取回结果
+- 跨平台：Windows / Linux 共用一套 Python 核心
+- 容器化：支持 Docker 一键部署
 
-1. Query planning
-2. Multi-source search
-3. Web extraction
-4. Iterative expansion (deep mode)
-5. Structured report with findings and source references
+## 适配场景
 
-This makes it easier to build a "compatibility layer + research layer" for AstrBot/NapCat.
+1. AstrBot 集成场景（推荐）
+- 在 AstrBot 的 MCP 配置中接入 Astrace 服务地址
+- 模板文件：`examples/astrbot_mcp_servers.example.json`
+- AstrBot 文档：<https://docs.astrbot.app/>
 
-## Tools Exposed
+2. 独立使用场景
+- 直接启动 Astrace MCP 服务
+- 在任何支持 MCP 的客户端中接入 `http://127.0.0.1:8788/mcp`
+
+## 暴露工具
 
 - `research(topic, mode, max_iterations, max_pages, max_results_per_query, include_raw_text)`
 - `start_research(...)`
@@ -31,21 +35,16 @@ This makes it easier to build a "compatibility layer + research layer" for AstrB
 - `get_research_result(task_id)`
 - `research_health()`
 
-`mode` behavior:
-- `auto`: planner decides deep or shallow.
-- `shallow`: single-pass, low-latency lookup.
-- `deep`: iterative expansion for broad or comparative research.
+## 运行环境变量
 
-## Runtime Environment Variables
+- `MCP_HOST`（默认 `0.0.0.0`）
+- `MCP_PORT`（默认 `8788`）
+- `SEARCH_MAX_RESULTS`（默认 `8`）
+- `REQUEST_TIMEOUT`（默认 `15`）
+- `MAX_TEXT_CHARS`（默认 `12000`）
+- `ASTRACE_TASK_WORKERS`（默认 `2`）
 
-- `MCP_HOST` (default `0.0.0.0`)
-- `MCP_PORT` (default `8788`)
-- `SEARCH_MAX_RESULTS` (default `8`)
-- `REQUEST_TIMEOUT` (default `15`)
-- `MAX_TEXT_CHARS` (default `12000`)
-- `ASTRACE_TASK_WORKERS` (default `2`)
-
-## Windows (First-Class Path)
+## Windows（优先路径）
 
 ```powershell
 cd Astrace
@@ -54,7 +53,7 @@ cd Astrace
 .\scripts\windows\start.ps1
 ```
 
-Server endpoint:
+默认 MCP 地址：
 - `http://127.0.0.1:8788/mcp`
 
 ## Linux
@@ -67,7 +66,7 @@ chmod +x scripts/linux/*.sh
 ./scripts/linux/start.sh
 ```
 
-Server endpoint:
+默认 MCP 地址：
 - `http://127.0.0.1:8788/mcp`
 
 ## Docker
@@ -79,44 +78,38 @@ docker compose -f docker/docker-compose.yml up -d --build
 docker compose -f docker/docker-compose.yml logs -f astrace
 ```
 
-Server endpoint (host):
+主机访问地址：
 - `http://127.0.0.1:8788/mcp`
 
-If AstrBot runs in another container on the same network, use the service name:
+如果 AstrBot 在同一 Docker 网络内运行，建议使用服务名：
 - `http://astrace:8788/mcp`
 
-## AstrBot MCP Integration
+## AstrBot MCP 接入说明
 
-Template file:
+参考模板：
 - `examples/astrbot_mcp_servers.example.json`
 
-Typical mapping (field names vary by AstrBot version):
+常见映射（不同 AstrBot 版本字段名可能有差异）：
 - `transport`: `streamable_http`
-- `url`: `http://127.0.0.1:8788/mcp` (or Docker service URL)
-- `headers`: optional custom headers
+- `url`: `http://127.0.0.1:8788/mcp`（或 Docker 服务地址）
+- `headers`: 可选
 
-If your AstrBot build has a different schema, keep the same endpoint/transport semantics and map keys accordingly.
+## 测试
 
-## Testing
-
-Windows:
+Windows：
 ```powershell
 .\scripts\windows\test.ps1
 ```
 
-Linux:
+Linux：
 ```bash
 ./scripts/linux/test.sh
 ```
 
-Both include:
-- deterministic self-test (`python -m astrace.server --self-test`)
-- unit tests (`pytest -q`)
+## 项目结构
 
-## File Layout
-
-- `astrace/` shared core (Windows/Linux/Docker all use this)
-- `scripts/windows/` Windows bootstrap/start/test
-- `scripts/linux/` Linux bootstrap/start/test
-- `docker/` Dockerfile + compose + env template
-- `examples/` AstrBot MCP config template
+- `astrace/`：共享核心
+- `scripts/windows/`：Windows 一键脚本
+- `scripts/linux/`：Linux 一键脚本
+- `docker/`：Dockerfile + compose + env 模板
+- `examples/`：AstrBot MCP 配置模板
