@@ -24,6 +24,13 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
 def build_components() -> tuple[ResearchEngine, ResearchTaskManager]:
     timeout = float(os.getenv("REQUEST_TIMEOUT", "15"))
     max_chars = _int_env("MAX_TEXT_CHARS", 12000)
@@ -106,13 +113,20 @@ def research_health() -> dict[str, Any]:
         "service": "Astrace",
         "mcp_host": os.getenv("MCP_HOST", "0.0.0.0"),
         "mcp_port": _int_env("MCP_PORT", 8788),
+        "stateless_http": _bool_env("ASTRACE_STATELESS_HTTP", True),
     }
 
 
 def run_server() -> None:
     host = os.getenv("MCP_HOST", os.getenv("ASTRACE_HOST", "0.0.0.0"))
     port = _int_env("MCP_PORT", _int_env("ASTRACE_PORT", 8788))
-    MCP.run(transport="streamable-http", host=host, port=port)
+    stateless_http = _bool_env("ASTRACE_STATELESS_HTTP", True)
+    MCP.run(
+        transport="streamable-http",
+        host=host,
+        port=port,
+        stateless_http=stateless_http,
+    )
 
 
 def self_test() -> int:
@@ -161,4 +175,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
